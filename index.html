@@ -96,6 +96,7 @@ u{text-decoration:none;border-bottom:1.5px solid var(--accent);}
 .qh{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
 .tag{font-family:var(--mono);font-size:12px;padding:1px 8px;border-radius:3px;background:var(--accent-soft);color:var(--accent-ink)}
 .tag.sim{background:var(--green);color:#fff}
+.tag.hist{background:transparent;border:1px dashed var(--line);color:var(--muted);font-family:var(--sans)}
 .tag.md{background:transparent;border:1px solid var(--line);color:var(--muted);font-family:var(--sans)}
 .qt{font-size:15.5px;margin:4px 0 10px}
 .qt .it{font-family:var(--mono);color:var(--accent);font-weight:600}
@@ -177,11 +178,14 @@ const DATA={"mods":[{"id":1,"t":"央行不動產管制","sub":"公司法人購�
 const LS='credit_notes_v1';
 let ST={};try{ST=JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){ST={}}
 const save=()=>{try{localStorage.setItem(LS,JSON.stringify(ST))}catch(e){}};
+let HI={};try{HI=JSON.parse(localStorage.getItem(LS+'_hist')||'{}')}catch(e){HI={}}
+const saveH=()=>{try{localStorage.setItem(LS+'_hist',JSON.stringify(HI))}catch(e){}};
+function record(q,i){const h=HI[q.id]||(HI[q.id]={n:0,w:0});h.n++;if(!isOk(q,i))h.w++;saveH()}
 try{const t=localStorage.getItem(LS+'_theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
 const ALL=[...DATA.pq,...DATA.sq], BYID={};ALL.forEach(q=>BYID[q.id]=q);
 const MOD={};DATA.mods.forEach(m=>MOD[m.id]=m);
 const L='1234';
-let view='mod', cur=1, quiz=null;
+let view='mod', cur=1, quiz=null, keep=new Set();
 const $=s=>document.querySelector(s);
 const pad=n=>String(n).padStart(2,'0');
 const isOk=(q,i)=>q.a===null||q.a===undefined?true:i===q.a;
@@ -208,8 +212,8 @@ function cite(c){
   const lec=(c.b||'').startsWith('講義');
   return `<div class="cite${lec?' lec':''}"><span class="lb">${lec?'講義依據':'細則依據'}</span><span class="path">${path}</span><div class="tx">${c.t}</div></div>`;
 }
-function qcard(q,showMod){
-  const v=ST[q.id], done=v!==undefined, sim=q.id[0]==='S';
+function qcard(q,showMod,qz){
+  const v=qz?quiz.ans[q.id]:ST[q.id], h=HI[q.id], done=v!==undefined, sim=q.id[0]==='S';
   const head=sim?(q.src?`<span class="tag sim lecq">講義新題</span>`:`<span class="tag sim">模擬題</span>`):`<span class="tag">${q.y} 年・第 ${q.n} 題</span>`;
   const md=showMod?`<span class="tag md">${pad(q.m)} ${MOD[q.m].t}</span>`:'';
   const opts=q.o.map((o,i)=>{let c='';if(done){if(q.a===null||q.a===undefined){if(i===v)c='ok'}else if(i===q.a)c='ok';else if(i===v)c='bad'}
@@ -222,7 +226,7 @@ function qcard(q,showMod){
     const warn=q.lo===1?`<div class="warn">本題出自行內作業要點／信保手冊等，細則未直接收錄${q.ci?'；下方為細則中最相關條文':''}</div>`:q.lo===2?`<div class="warn">細則條文比對信心較低，僅供參考</div>`:'';
     ans=`<div class="ans"><button class="redo" data-r="${q.id}">重作</button>${ver}${q.x?`<div class="exp">${q.x}</div>`:''}${warn}${cite(q.ci)}</div>`;
   }
-  return `<div class="qc ${done?'done':''}" id="c-${q.id}"><div class="qh">${head}${md}</div><div class="qt">${q.q}</div>${opts}${ans}</div>`;
+  return `<div class="qc ${done?'done':''}" id="c-${q.id}" data-z="${qz?1:''}"><div class="qh">${head}${md}${h?`<span class="tag hist">作答 ${h.n} 次・錯 ${h.w} 次</span>`:''}</div><div class="qt">${q.q}</div>${opts}${ans}</div>`;
 }
 function renderMod(){
   const m=MOD[cur], pq=DATA.pq.filter(q=>q.m===cur), sq=DATA.sq.filter(q=>q.m===cur);
@@ -244,10 +248,10 @@ function renderMod(){
    <section><h3>重點筆記</h3>${notes}</section>
    <section><h3>必背數字</h3><div class="nums">${nums}</div></section>
    <section><h3>考古題練習<small>點選選項即判對錯並附細則依據</small></h3>
-     <div class="qtools"><button class="btn" data-reset="p">清除本考點考古題作答</button><span class="legend">顯示 ${fp.length}/${pq.length} 題</span></div>
+     <div class="qtools"><button class="btn" data-reset="p">本考點考古題全部重作</button><button class="btn" data-reset="pb">只重作答錯的</button><span class="legend">顯示 ${fp.length}/${pq.length} 題</span></div>
      ${fp.map(q=>qcard(q)).join('')||'<div class="empty">沒有符合篩選條件的題目</div>'}</section>
    <section><h3>模擬題<small>仿考古題命題＋2026 講義新題，附細則／講義原文出處</small></h3>
-     <div class="qtools"><button class="btn" data-reset="s">清除本考點模擬題作答</button><span class="legend">顯示 ${fs.length}/${sq.length} 題</span></div>
+     <div class="qtools"><button class="btn" data-reset="s">本考點模擬題全部重作</button><button class="btn" data-reset="sb">只重作答錯的</button><span class="legend">顯示 ${fs.length}/${sq.length} 題</span></div>
      ${fs.map(q=>qcard(q)).join('')||'<div class="empty">沒有符合篩選條件的題目</div>'}</section>`;
 }
 function renderSearch(kw){
@@ -271,7 +275,7 @@ function renderQuiz(){
      <div class="qzbar">
        <label>題源 <select id="qsrc"><option value="mix">考古題＋模擬題</option><option value="p">只考古題</option><option value="s">只模擬題</option></select></label>
        <label>題數 <select id="qn"><option>10</option><option selected>20</option><option>30</option><option>60</option></select></label>
-       <label>優先 <select id="qpr"><option value="">隨機</option><option value="un">未作答優先</option><option value="bad">答錯優先</option></select></label>
+       <label>優先 <select id="qpr"><option value="">隨機</option><option value="un">未作答優先</option><option value="bad">答錯優先</option><option value="badonly">只考答錯的</option><option value="hard">常錯題優先</option></select></label>
        <button class="btn pri" id="qgo">開始測驗</button></div>
      <div class="mchk" id="qm">${DATA.mods.map(m=>`<label><input type="checkbox" value="${m.id}" checked> ${pad(m.id)} ${m.t}</label>`).join('')}</div>
      `;
@@ -282,13 +286,14 @@ function renderQuiz(){
   const ok=quiz.filter(id=>quiz.ans[id]!==undefined&&isOk(BYID[id],quiz.ans[id])).length;
   $('#main').innerHTML=`<div class="mtitle"><h2>綜合測驗</h2></div>
    <div class="qzbar"><span>進度 <b class="score">${fin}/${quiz.length}</b></span><span>答對 <b class="score">${ok}</b></span>
-   <span>得分 <b class="score">${fin?Math.round(ok/quiz.length*100):0}</b></span><button class="btn" id="qnew">重新出題</button></div>
-   ${quiz.map((id,i)=>`<div class="legend" style="margin-top:14px">第 ${i+1} 題</div>`+qcard(BYID[id],true)).join('')}`;
+   <span>得分 <b class="score">${fin?Math.round(ok/quiz.length*100):0}</b></span><button class="btn" id="qagain">整份重考</button>${fin>ok?`<button class="btn" id="qwrong">只重考答錯的（${fin-ok} 題）</button>`:''}<button class="btn" id="qnew">重新出題</button></div>
+   ${fin===quiz.length?`<div class="legend" style="margin-top:10px">已完成！可「整份重考」（題序重新打亂）或「只重考答錯的」反覆練習</div>`:''}
+   ${quiz.map((id,i)=>`<div class="legend" style="margin-top:14px">第 ${i+1} 題</div>`+qcard(BYID[id],true,1)).join('')}`;
 }
 function renderWrong(){
-  const w=ALL.filter(q=>status(q)==='bad');
-  $('#main').innerHTML=`<div class="mtitle"><h2>錯題本</h2></div><div class="msub">目前答錯 ${w.length} 題（按「重作」重新作答，答對即移出）</div>
-   <div class="qtools"><button class="btn" data-reset="all">清除全部作答紀錄</button></div>
+  const w=ALL.filter(q=>status(q)==='bad'||keep.has(q.id)), nb=ALL.filter(q=>status(q)==='bad').length;
+  $('#main').innerHTML=`<div class="mtitle"><h2>錯題本</h2></div><div class="msub">目前答錯 ${nb} 題（按「重作」重新作答；答對的題目下次進入錯題本時移出）</div>
+   <div class="qtools">${nb?`<button class="btn pri" data-reset="wrong">錯題全部重作</button>`:''}<button class="btn" data-reset="all">清除全部作答紀錄</button></div>
    ${DATA.mods.map(m=>{const l=w.filter(q=>q.m===m.id);return l.length?`<section><h3>${pad(m.id)} ${m.t}<small>${l.length} 題</small></h3>${l.map(q=>qcard(q)).join('')}</section>`:''}).join('')||'<div class="empty">目前沒有錯題 👍</div>'}`;
 }
 function render(){
@@ -306,27 +311,37 @@ document.addEventListener('click',e=>{
   const t=e.target.closest('button,.mi,a[data-go]');if(!t)return;
   if(t.matches('a[data-go]')){e.preventDefault();cur=+t.dataset.go;view='mod';render();scrollTo(0,0);return}
   if(t.classList.contains('mi')){cur=+t.dataset.m;view='mod';$('#q').value='';render();scrollTo({top:0});return}
-  if(t.dataset.v){view=t.dataset.v;$('#q').value='';render();return}
+  if(t.dataset.v){view=t.dataset.v;keep.clear();$('#q').value='';render();return}
   if(t.id==='theme'){const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark';try{localStorage.setItem(LS+'_theme',r.dataset.theme)}catch(e){}return}
   if(t.classList.contains('op')){
-    const id=t.dataset.q;if(ST[id]!==undefined)return;
-    ST[id]=+t.dataset.i;if(quiz&&quiz.includes(id))quiz.ans[id]=ST[id];save();
-    const card=document.getElementById('c-'+id);const q=BYID[id];
-    const tmp=document.createElement('div');tmp.innerHTML=qcard(q,!!card.querySelector('.tag.md'));card.replaceWith(tmp.firstElementChild);
+    const id=t.dataset.q, card=document.getElementById('c-'+id), qz=card.dataset.z==='1'&&!!quiz, q=BYID[id], i=+t.dataset.i;
+    if((qz?quiz.ans[id]:ST[id])!==undefined)return;
+    ST[id]=i;if(qz)quiz.ans[id]=i;record(q,i);save();
+    const tmp=document.createElement('div');tmp.innerHTML=qcard(q,!!card.querySelector('.tag.md'),qz);card.replaceWith(tmp.firstElementChild);
     header();sidebar();
     if(view==='quiz'&&quiz&&!$('#q').value){const y=scrollY;renderQuiz();scrollTo(0,y)}
     return}
-  if(t.dataset.r){const id=t.dataset.r;delete ST[id];if(quiz&&quiz.ans)delete quiz.ans[id];save();const card=document.getElementById('c-'+id);const tmp=document.createElement('div');tmp.innerHTML=qcard(BYID[id],!!card.querySelector('.tag.md'));card.replaceWith(tmp.firstElementChild);header();sidebar();return}
+  if(t.dataset.r){const id=t.dataset.r, card=document.getElementById('c-'+id), qz=card.dataset.z==='1'&&!!quiz;
+    if(qz)delete quiz.ans[id];else{if(view==='wrong')keep.add(id);delete ST[id];save()}
+    if(qz){const y=scrollY;renderQuiz();scrollTo(0,y);header();sidebar();return}
+    const tmp=document.createElement('div');tmp.innerHTML=qcard(BYID[id],!!card.querySelector('.tag.md'));card.replaceWith(tmp.firstElementChild);header();sidebar();return}
   if(t.dataset.reset){const k=t.dataset.reset;
-    if(k==='all'){if(!confirm('確定清除全部作答紀錄？'))return;ST={}}
-    else ALL.filter(q=>q.m===cur&&(k==='p'?q.id[0]!=='S':q.id[0]==='S')).forEach(q=>delete ST[q.id]);
+    if(k==='all'){if(!confirm('確定清除全部作答紀錄（含作答次數統計）？'))return;ST={};HI={};saveH();keep.clear()}
+    else if(k==='wrong')ALL.filter(q=>status(q)==='bad').forEach(q=>{keep.add(q.id);delete ST[q.id]});
+    else ALL.filter(q=>q.m===cur&&(k[0]==='p'?q.id[0]!=='S':q.id[0]==='S')&&(k.length===1||status(q)==='bad')).forEach(q=>delete ST[q.id]);
     save();render();return}
   if(t.id==='qgo'){
     const ms=[...document.querySelectorAll('#qm input:checked')].map(x=>+x.value);
     const src=$('#qsrc').value,n=+$('#qn').value,pr=$('#qpr').value;
     let pool=(src==='p'?DATA.pq:src==='s'?DATA.sq:ALL).filter(q=>ms.includes(q.m));
-    shuffle(pool);if(pr)pool.sort((a,b)=>(status(b)===pr)-(status(a)===pr));
-    quiz=pool.slice(0,n).map(q=>q.id);quiz.ans={};quiz.forEach(id=>{delete ST[id]});save();render();scrollTo(0,0);return}
+    if(pr==='badonly')pool=pool.filter(q=>status(q)==='bad');
+    shuffle(pool);
+    if(pr==='hard'){const r=q=>HI[q.id]?HI[q.id].w/HI[q.id].n:0;pool.sort((a,b)=>r(b)-r(a))}
+    else if(pr&&pr!=='badonly')pool.sort((a,b)=>(status(b)===pr)-(status(a)===pr));
+    if(!pool.length){alert('沒有符合條件的題目');return}
+    quiz=pool.slice(0,n).map(q=>q.id);quiz.ans={};render();scrollTo(0,0);return}
+  if(t.id==='qagain'){quiz.ans={};shuffle(quiz);render();scrollTo(0,0);return}
+  if(t.id==='qwrong'){const w=quiz.filter(id=>quiz.ans[id]!==undefined&&!isOk(BYID[id],quiz.ans[id]));quiz=shuffle(w);quiz.ans={};render();scrollTo(0,0);return}
   if(t.id==='qnew'){quiz=null;render();return}
 });
 $('#q').addEventListener('input',()=>render());
