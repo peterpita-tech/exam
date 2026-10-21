@@ -126,7 +126,7 @@ table.nt th,table.nt td{border:1px solid var(--line);padding:7px 10px;text-align
 table.nt th{background:var(--line2);font-weight:700}
 table.nt td.k{font-family:var(--mono);color:var(--accent-ink);white-space:nowrap}
 .qzbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.score{font-family:var(--mono);font-size:22px;color:var(--accent-ink)}
+.score{font-family:var(--mono);font-size:22px;color:var(--accent-ink)}.score.big{font-size:40px}.qzres{border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--card);border-radius:8px;padding:14px 18px;margin:16px 0}.qpart{font-family:var(--serif);margin:26px 0 4px;color:var(--accent-ink)}
 .mchk{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0;font-size:13.5px}
 .mchk label{cursor:pointer}
 .legend{font-size:12.5px;color:var(--muted)}
@@ -149,12 +149,12 @@ table.nt td.k{font-family:var(--mono);color:var(--accent-ink);white-space:nowrap
 <header>
   <div>
     <h1>徵授信業務 考點學習筆記</h1>
-    <div class="xlink"><b>徵授信</b><a href="外匯業務-考點學習筆記.html">外匯</a><a href="存匯會計-考點學習筆記.html">存匯會計</a></div>
+    <div class="xlink"><b>徵授信</b><a href="外匯業務-考點學習筆記.html">外匯</a><a href="存匯會計業務-考點學習筆記.html">存匯會計</a></div>
     <div class="stat" id="stat"></div>
   </div>
   <nav class="tabs" id="tabs">
     <button data-v="mod" class="on">考點</button>
-    <button data-v="quiz">綜合測驗</button>
+    <button data-v="quiz">模擬考 60 題</button>
     <button data-v="nums">必背數字</button>
     <button data-v="wrong">錯題本</button>
     <button class="theme" id="theme" title="切換深淺色">◐</button>
@@ -271,24 +271,28 @@ function renderNums(){
 }
 function renderQuiz(){
   if(!quiz){
-    $('#main').innerHTML=`<div class="mtitle"><h2>綜合測驗</h2></div><div class="msub">從考古題與模擬題隨機抽題，作答立即解答並附細則（作答結果同步記錄）</div>
+    $('#main').innerHTML=`<div class="mtitle"><h2>模擬考（60 題・100 分）</h2></div><div class="msub">模擬正式測驗：每次 60 題，第 1～20 題每題 2 分、第 21～60 題每題 1.5 分，滿分 100 分；作答立即解答並附出處，全部作答完成後計分</div>
      <div class="qzbar">
        <label>題源 <select id="qsrc"><option value="mix">考古題＋模擬題</option><option value="p">只考古題</option><option value="s">只模擬題</option></select></label>
-       <label>題數 <select id="qn"><option>10</option><option selected>20</option><option>30</option><option>60</option></select></label>
        <label>優先 <select id="qpr"><option value="">隨機</option><option value="un">未作答優先</option><option value="bad">答錯優先</option><option value="badonly">只考答錯的</option><option value="hard">常錯題優先</option></select></label>
-       <button class="btn pri" id="qgo">開始測驗</button></div>
+       <button class="btn pri" id="qgo">開始 60 題模擬考</button></div>
      <div class="mchk" id="qm">${DATA.mods.map(m=>`<label><input type="checkbox" value="${m.id}" checked> ${pad(m.id)} ${m.t}</label>`).join('')}</div>
      `;
     return;
   }
-  const s=stats(quiz.map(id=>BYID[id]).filter(q=>quiz.ans[q.id]!==undefined));
-  const fin=quiz.filter(id=>quiz.ans[id]!==undefined).length;
-  const ok=quiz.filter(id=>quiz.ans[id]!==undefined&&isOk(BYID[id],quiz.ans[id])).length;
-  $('#main').innerHTML=`<div class="mtitle"><h2>綜合測驗</h2></div>
-   <div class="qzbar"><span>進度 <b class="score">${fin}/${quiz.length}</b></span><span>答對 <b class="score">${ok}</b></span>
-   <span>得分 <b class="score">${fin?Math.round(ok/quiz.length*100):0}</b></span><button class="btn" id="qagain">整份重考</button>${fin>ok?`<button class="btn" id="qwrong">只重考答錯的（${fin-ok} 題）</button>`:''}<button class="btn" id="qnew">重新出題</button></div>
-   ${fin===quiz.length?`<div class="legend" style="margin-top:10px">已完成！可「整份重考」（題序重新打亂）或「只重考答錯的」反覆練習</div>`:''}
-   ${quiz.map((id,i)=>`<div class="legend" style="margin-top:14px">第 ${i+1} 題</div>`+qcard(BYID[id],true,1)).join('')}`;
+  const W=i=>i<20?2:1.5, tot=quiz.reduce((a,_,i)=>a+W(i),0);
+  const fin=quiz.filter(id=>quiz.ans[id]!==undefined).length, done=fin===quiz.length;
+  const okI=quiz.map((id,i)=>quiz.ans[id]!==undefined&&isOk(BYID[id],quiz.ans[id])?i:-1).filter(i=>i>=0);
+  const ok1=okI.filter(i=>i<20).length, ok2=okI.length-ok1, n1=Math.min(20,quiz.length), n2=quiz.length-n1;
+  const pts=okI.reduce((a,i)=>a+W(i),0), score=Math.round(pts/tot*1000)/10;
+  const res=done?`<div class="qzres"><div><span class="legend">總分</span><b class="score big">${score}</b><span class="legend"> / 100</span></div>
+     <div class="legend">第一部分 ${ok1}/${n1} 題 × 2 分 ＝ ${ok1*2}　｜　第二部分 ${ok2}/${n2} 題 × 1.5 分 ＝ ${ok2*1.5}</div></div>`:'';
+  $('#main').innerHTML=`<div class="mtitle"><h2>模擬考（60 題・100 分）</h2></div>
+   <div class="qzbar"><span>進度 <b class="score">${fin}/${quiz.length}</b></span><span>答對 <b class="score">${okI.length}</b></span>
+   <span>得分 <b class="score">${done?score:'—'}</b>${done?'':'<span class="legend">（全部作答後計分）</span>'}</span><button class="btn" id="qagain">整份重考</button>${fin>okI.length?`<button class="btn" id="qwrong">只重考答錯的（${fin-okI.length} 題）</button>`:''}<button class="btn" id="qnew">重新出題</button></div>
+   ${res}
+   ${quiz.map((id,i)=>(i===0?`<h3 class="qpart">第一部分（第 1～${n1} 題，每題 2 分）</h3>`:i===20?`<h3 class="qpart">第二部分（第 21～${quiz.length} 題，每題 1.5 分）</h3>`:'')+`<div class="legend" style="margin-top:14px">第 ${i+1} 題・${W(i)} 分</div>`+qcard(BYID[id],true,1)).join('')}
+   ${res}`;
 }
 function renderWrong(){
   const w=ALL.filter(q=>status(q)==='bad'||keep.has(q.id)), nb=ALL.filter(q=>status(q)==='bad').length;
@@ -332,7 +336,7 @@ document.addEventListener('click',e=>{
     save();render();return}
   if(t.id==='qgo'){
     const ms=[...document.querySelectorAll('#qm input:checked')].map(x=>+x.value);
-    const src=$('#qsrc').value,n=+$('#qn').value,pr=$('#qpr').value;
+    const src=$('#qsrc').value,n=60,pr=$('#qpr').value;
     let pool=(src==='p'?DATA.pq:src==='s'?DATA.sq:ALL).filter(q=>ms.includes(q.m));
     if(pr==='badonly')pool=pool.filter(q=>status(q)==='bad');
     shuffle(pool);
