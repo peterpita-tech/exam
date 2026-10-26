@@ -107,6 +107,10 @@ u{text-decoration:none;border-bottom:1.5px solid var(--accent);}
 .tag{font-family:var(--mono);font-size:12px;padding:1px 8px;border-radius:3px;background:var(--accent-soft);color:var(--accent-ink)}
 .tag.sim{background:var(--green);color:#fff}
 .tag.hist{background:transparent;border:1px dashed var(--line);color:var(--muted);font-family:var(--sans)}
+details.qsec{max-width:880px}details.qsec>summary{list-style:none;cursor:pointer}details.qsec>summary::-webkit-details-marker{display:none}
+details.qsec>summary h3::before{content:'▸';display:inline-block;width:1.1em;color:var(--accent);transition:transform .15s}
+details.qsec[open]>summary h3::before{transform:rotate(90deg)}details.qsec>summary .cnt{font-family:var(--sans);font-size:13px;color:var(--muted);margin-left:8px}
+.rwbar{background:var(--warn-bg);color:var(--warn);border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:10px 0;font-size:13.5px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .tag.md{background:transparent;border:1px solid var(--line);color:var(--muted);font-family:var(--sans)}
 .qt{font-size:15.5px;margin:4px 0 10px}
 .qt .it{font-family:var(--mono);color:var(--accent);font-weight:600}
@@ -198,7 +202,7 @@ if(!DATA.rv)document.getElementById('tabrv').style.display='none';
 const ALL=[...DATA.pq,...DATA.sq], BYID={};ALL.forEach(q=>BYID[q.id]=q);
 const MOD={};DATA.mods.forEach(m=>MOD[m.id]=m);
 const L='1234';
-let view='mod', cur=1, quiz=null, keep=new Set();
+let view='mod', cur=1, quiz=null, keep=new Set(), OPEN={}, RW={};
 const $=s=>document.querySelector(s);
 const pad=n=>String(n).padStart(2,'0');
 const isOk=(q,i)=>q.a===null||q.a===undefined?true:i===q.a;
@@ -247,7 +251,9 @@ function renderMod(){
   const s=stats([...pq,...sq]);
   const notes=m.notes.map(([h,items],i)=>`<span class="badge b${i%2}">${h}</span><ul class="nt">${items.map(x=>`<li>${x}</li>`).join('')}</ul>`).join('');
   const nums=m.nums.map(([k,v])=>`<div class="num"><b>${k}</b><span>${v}</span></div>`).join('');
-  const fp=filt(pq), fs=filt(sq);
+  const rp=RW[cur+'p'], rs=RW[cur+'s'];
+  const fp=rp?pq.filter(q=>rp.has(q.id)):filt(pq), fs=rs?sq.filter(q=>rs.has(q.id)):filt(sq);
+  const rwb=(k,n)=>`<div class="rwbar">重作錯題中：只顯示剛才答錯的 ${n} 題（作答後仍保留在此清單）<button class="btn" data-rwx="${k}">顯示全部題目</button></div>`;
   $('#main').innerHTML=`
    <div class="mtitle"><span class="code">${pad(m.id)}</span><h2>${m.t}</h2></div>
    <div class="msub">${m.sub}</div>
@@ -261,12 +267,12 @@ function renderMod(){
    <div class="yrs">${Object.entries(m.yrs).map(([y,c])=>`<span>${y}年 ${c}題</span>`).join('')}<span>出題頻率：${m.w}</span></div>
    <section><h3>重點筆記</h3>${notes}</section>
    <section><h3>必背數字</h3><div class="nums">${nums}</div></section>
-   <section><h3>考古題練習<small>點選選項即判對錯並附細則依據</small></h3>
+   <details class="qsec" data-sec="p"${OPEN.p||rp?' open':''}><summary><h3>考古題練習<span class="cnt">${pq.length} 題・已答 ${stats(pq).d}</span><small>點選選項即判對錯並附細則依據（點此展開／收合）</small></h3></summary>${rp?rwb('p',fp.length):''}
      <div class="qtools"><button class="btn" data-reset="p">本考點考古題全部重作</button><button class="btn" data-reset="pb">只重作答錯的</button><span class="legend">顯示 ${fp.length}/${pq.length} 題</span></div>
-     ${fp.map(q=>qcard(q)).join('')||'<div class="empty">沒有符合篩選條件的題目</div>'}</section>
-   <section><h3>模擬題<small>仿考古題命題＋講義／作業要點／信保手冊新題，附原文出處</small></h3>
+     ${fp.map(q=>qcard(q)).join('')||'<div class="empty">沒有符合篩選條件的題目</div>'}</details>
+   <details class="qsec" data-sec="s"${OPEN.s||rs?' open':''}><summary><h3>模擬題<span class="cnt">${sq.length} 題・已答 ${stats(sq).d}</span><small>仿考古題命題＋講義／作業要點／信保手冊新題，附原文出處（點此展開／收合）</small></h3></summary>${rs?rwb('s',fs.length):''}
      <div class="qtools"><button class="btn" data-reset="s">本考點模擬題全部重作</button><button class="btn" data-reset="sb">只重作答錯的</button><span class="legend">顯示 ${fs.length}/${sq.length} 題</span></div>
-     ${fs.map(q=>qcard(q)).join('')||'<div class="empty">沒有符合篩選條件的題目</div>'}</section>`;
+     ${fs.map(q=>qcard(q)).join('')||'<div class="empty">沒有符合篩選條件的題目</div>'}</details>`;
 }
 function renderSearch(kw){
   const k=kw.toLowerCase(), strip=s=>s.replace(/<[^>]+>/g,'').toLowerCase();
@@ -381,10 +387,13 @@ document.addEventListener('click',e=>{
     if(qz)delete quiz.ans[id];else{if(view==='wrong')keep.add(id);delete ST[id];save()}
     if(qz){const y=scrollY;renderQuiz();scrollTo(0,y);header();sidebar();return}
     const tmp=document.createElement('div');tmp.innerHTML=qcard(BYID[id],!!card.querySelector('.tag.md'));card.replaceWith(tmp.firstElementChild);header();sidebar();return}
+  if(t.dataset.rwx){delete RW[cur+t.dataset.rwx];render();return}
   if(t.dataset.reset){const k=t.dataset.reset;
     if(k==='all'){if(!confirm('確定清除全部作答紀錄（含作答次數統計）？'))return;ST={};HI={};saveH();keep.clear()}
     else if(k==='wrong')ALL.filter(q=>status(q)==='bad').forEach(q=>{keep.add(q.id);delete ST[q.id]});
-    else ALL.filter(q=>q.m===cur&&(k[0]==='p'?q.id[0]!=='S':q.id[0]==='S')&&(k.length===1||status(q)==='bad')).forEach(q=>delete ST[q.id]);
+    else{const l=ALL.filter(q=>q.m===cur&&(k[0]==='p'?q.id[0]!=='S':q.id[0]==='S')&&(k.length===1||status(q)==='bad'));
+      if(k.length>1){if(!l.length){alert('本考點目前沒有答錯的題目');return}RW[cur+k[0]]=new Set(l.map(q=>q.id));OPEN[k[0]]=true}else delete RW[cur+k[0]];
+      l.forEach(q=>delete ST[q.id])}
     save();render();return}
   if(t.id==='qgo'){
     const ms=[...document.querySelectorAll('#qm input:checked')].map(x=>+x.value);
@@ -409,6 +418,7 @@ $('#q').addEventListener('input',()=>render());
 let rvT;document.addEventListener('input',e=>{if(e.target.id==='rvq'){clearTimeout(rvT);rvT=setTimeout(rvFilter,150)}});
 $('#fy').addEventListener('change',()=>render());
 $('#fs').addEventListener('change',()=>render());
+document.addEventListener('toggle',e=>{const d=e.target;if(d.dataset&&d.dataset.sec)OPEN[d.dataset.sec]=d.open},true);
 render();
 </script>
 </body>
