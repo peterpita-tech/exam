@@ -316,10 +316,10 @@ function renderQuiz(){
     $('#main').innerHTML=`<div class="mtitle"><h2>模擬考（60 題・100 分）</h2></div><div class="msub">模擬正式測驗：每次 60 題，第 1～20 題每題 2 分、第 21～60 題每題 1.5 分，滿分 100 分；作答立即解答並附出處，全部作答完成後計分</div>
      <div class="msub">114 年題型比例：${['neg','combo','fill','ask'].map(k=>`${{neg:'錯誤／為非',combo:'組合題',fill:'填空題',ask:'純問答'}[k]} ${Math.round((DATA.qt||{})[k]*100)}%`).join('・')}（依比例抽題時每次約 ${['neg','combo','fill','ask'].map(k=>Math.round(((DATA.qt||{})[k]||0)*60)).join('／')} 題）</div>
      <div class="qzbar">
-       <label>題源 <select id="qsrc"><option value="mix">考古題＋模擬題</option><option value="p">只考古題</option><option value="s">只模擬題</option></select></label>
+       <label>題源 <select id="qsrc"><option value="mix">考古題＋模擬題</option><option value="p">只考古題</option><option value="s">只模擬題</option><optgroup label="歷年考古題（原卷 60 題・原題序）">${[110,111,112,113,114].map(y=>`<option value="y${y}">${y} 年考古題</option>`).join('')}</optgroup></select></label>
        <label>題型 <select id="qtp"><option value="r">依 114 年題型比例</option><option value="">不限</option></select></label>
        <label>優先 <select id="qpr"><option value="">隨機</option><option value="un">未作答優先</option><option value="bad">答錯優先</option><option value="badonly">只考答錯的</option><option value="hard">常錯題優先</option></select></label>
-       <button class="btn pri" id="qgo">開始 60 題模擬考</button></div>
+       <span class="legend">選「歷年考古題」時依原卷題序作答，不受考點／題型／優先條件影響</span><button class="btn pri" id="qgo">開始 60 題模擬考</button></div>
      <div class="mchk" id="qm">${DATA.mods.map(m=>`<label><input type="checkbox" value="${m.id}" checked> ${pad(m.id)} ${m.t}</label>`).join('')}</div>
      `;
     return;
@@ -331,7 +331,7 @@ function renderQuiz(){
   const pts=okI.reduce((a,i)=>a+W(i),0), score=Math.round(pts/tot*1000)/10;
   const res=done?`<div class="qzres"><div><span class="legend">總分</span><b class="score big">${score}</b><span class="legend"> / 100</span></div>
      <div class="legend">第一部分 ${ok1}/${n1} 題 × 2 分 ＝ ${ok1*2}　｜　第二部分 ${ok2}/${n2} 題 × 1.5 分 ＝ ${ok2*1.5}</div></div>`:'';
-  $('#main').innerHTML=`<div class="mtitle"><h2>模擬考（60 題・100 分）</h2></div>
+  $('#main').innerHTML=`<div class="mtitle"><h2>${quiz.yr?quiz.yr+' 年考古題（原卷 60 題・100 分）':'模擬考（60 題・100 分）'}</h2></div>
    <div class="qzbar"><span>進度 <b class="score">${fin}/${quiz.length}</b></span><span>答對 <b class="score">${okI.length}</b></span>
    <span>得分 <b class="score">${done?score:'—'}</b>${done?'':'<span class="legend">（全部作答後計分）</span>'}</span><button class="btn" id="qagain">整份重考</button>${fin>okI.length?`<button class="btn" id="qwrong">只重考答錯的（${fin-okI.length} 題）</button>`:''}<button class="btn" id="qnew">重新出題</button></div>
    ${res}
@@ -398,6 +398,9 @@ document.addEventListener('click',e=>{
   if(t.id==='qgo'){
     const ms=[...document.querySelectorAll('#qm input:checked')].map(x=>+x.value);
     const src=$('#qsrc').value,n=60,pr=$('#qpr').value;
+    if(src[0]==='y'){const y=+src.slice(1);const pk=DATA.pq.filter(q=>q.y===y).sort((a,b)=>a.n-b.n);
+      if(!pk.length){alert('沒有該年度考題');return}
+      quiz=pk.map(q=>q.id);quiz.ans={};quiz.yr=y;render();scrollTo(0,0);return}
     let pool=(src==='p'?DATA.pq:src==='s'?DATA.sq:ALL).filter(q=>ms.includes(q.m));
     if(pr==='badonly')pool=pool.filter(q=>status(q)==='bad');
     shuffle(pool);
@@ -410,7 +413,7 @@ document.addEventListener('click',e=>{
       pick=[];K.forEach(k=>pick.push(...pool.filter(q=>q.t===k).slice(0,want[k])));
       const used=new Set(pick.map(q=>q.id));pick.push(...pool.filter(q=>!used.has(q.id)).slice(0,n-pick.length));shuffle(pick)}
     quiz=pick.map(q=>q.id);quiz.ans={};render();scrollTo(0,0);return}
-  if(t.id==='qagain'){quiz.ans={};shuffle(quiz);render();scrollTo(0,0);return}
+  if(t.id==='qagain'){quiz.ans={};if(!quiz.yr)shuffle(quiz);render();scrollTo(0,0);return}
   if(t.id==='qwrong'){const w=quiz.filter(id=>quiz.ans[id]!==undefined&&!isOk(BYID[id],quiz.ans[id]));quiz=shuffle(w);quiz.ans={};render();scrollTo(0,0);return}
   if(t.id==='qnew'){quiz=null;render();return}
 });
